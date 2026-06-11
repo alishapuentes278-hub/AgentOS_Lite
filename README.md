@@ -1,662 +1,599 @@
-# 🔧 AgentOS Lite
+# AgentOS Lite
 
-<div align="center">
+**Python + DeepSeek API DAG Multi-Agent Engine**
 
-**Python + DeepSeek API 驱动的 DAG 多 Agent 协作引擎**
-
-一键启动毕业设计全流程：Plan → HITL 审批 → DAG 执行 → Dashboard 监控
+Start-to-finish graduation project automation: Plan -> HITL Approval -> DAG Execution -> Live Dashboard
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![DeepSeek](https://img.shields.io/badge/LLM-DeepSeek%20v4-green.svg)](https://www.deepseek.com/)
 [![Streamlit](https://img.shields.io/badge/Dashboard-Streamlit-red.svg)](https://streamlit.io/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-</div>
-
 ---
 
-## 📖 目录
+## Table of Contents
 
-- [项目概述](#项目概述)
-- [设计哲学](#设计哲学)
-- [架构概览](#架构概览)
-- [快速开始](#快速开始)
-- [安装指南](#安装指南)
-- [配置 DeepSeek API](#配置-deepseek-api)
-- [完整使用流程](#完整使用流程)
-- [项目结构](#项目结构)
-- [核心模块详解](#核心模块详解)
-  - [Planner — 计划生成器](#1-planner--计划生成器)
-  - [Guard — HITL 审批门禁](#2-guard--hitl-审批门禁)
-  - [Executor — 核心执行循环](#3-executor--核心执行循环)
-  - [Scheduler — DAG 拓扑调度](#4-scheduler--dag-拓扑调度)
-- [Agent 系统](#agent-系统)
-- [Dashboard 实时监控](#dashboard-实时监控)
-- [运行时状态文件](#运行时状态文件)
-- [自定义与扩展](#自定义与扩展)
-- [架构演进历史](#架构演进历史)
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [DeepSeek API Setup (Required)](#deepseek-api-setup-required)
+- [Usage Walkthrough](#usage-walkthrough)
+- [Project Structure](#project-structure)
+- [Core Modules](#core-modules)
+- [Agent System](#agent-system)
+- [Dashboard](#dashboard)
+- [Runtime State Files](#runtime-state-files)
+- [Customization](#customization)
+- [Version History](#version-history)
 - [FAQ](#faq)
-- [贡献指南](#贡献指南)
-- [许可证](#许可证)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## 项目概述
+## Overview
 
-**AgentOS Lite** 是一个轻量级的 Python Agent 协作引擎。它用 DAG（有向无环图）管理多 Agent 任务依赖，通过 Plan-first + HITL（Human-in-the-Loop）审批确保执行质量，并提供 Streamlit Dashboard 实时监控任务进度。
+**AgentOS Lite** is a lightweight Python agent collaboration engine. It manages multi-agent task dependencies via DAG (Directed Acyclic Graph), enforces execution quality through Plan-first + HITL (Human-in-the-Loop) approval, and provides real-time progress monitoring through a Streamlit Dashboard.
 
-核心场景：**自动化完成毕业设计的完整工作流**——论文写作、代码开发、Bug 修复三位一体，由 DeepSeek v4 AI 驱动所有内容生成。
+**Primary use case**: automating the complete graduation project workflow -- thesis writing, code development, and bug fixing, all driven by the DeepSeek AI API.
 
-### 核心能力
+### Core Capabilities
 
-| 能力 | 说明 |
-|------|------|
-| 🤖 **多 Agent 协作** | Squad A (论文) + Squad B (代码) + BugFix (修复) |
-| 📊 **DAG 任务调度** | 拓扑排序 + 依赖感知，自动按序执行 |
-| 👤 **HITL 审批** | 执行前人工审核计划，Gate 不通过则阻断 |
-| 📡 **DeepSeek API** | 直连 DeepSeek API，OpenAI 兼容协议 |
-| 📈 **Streamlit Dashboard** | localhost:8501 实时监控任务状态 |
-| 🔌 **一键启动** | python main.py 全自动运行 |
+| Capability | Description |
+|---|---|
+| Multi-Agent | Squad A (Thesis) + Squad B (Code) + BugFix Agent |
+| DAG Scheduler | Topological sort + dependency-aware execution order |
+| HITL Approval | Human reviews plan before execution; rejected plans are blocked |
+| DeepSeek API | Direct connection via OpenAI-compatible protocol |
+| Streamlit Dashboard | Real-time task monitoring at localhost:8501 |
+| One-command Start | `python main.py` runs everything |
 
----
+### Design Philosophy
 
-## 设计哲学
+> "Protocol documents are perfect for reading. Executable code is perfect for running."
 
-> "协议文档架构在读的场景下完美，但在跑的场景下死重。用可执行代码替代协议文档。"
+AgentOS Lite v4.0 is a ground-up rewrite of its predecessor `grad-design-squad` v3.0:
 
-AgentOS Lite v4.0 是其前身 grad-design-squad v3.0 的彻底重写：
-
-| 维度 | v3.0 (旧) | v4.0 (新) |
-|------|----------|----------|
-| Agent 数量 | 48 个人物角色卡 | 3 个 Squad Agent |
-| 编排方式 | TL→Squad Lead→Sub-Agent 三级 | Plan→HITL→Executor 主循环 |
-| 门禁 | 17 道 Gate 检查点 | 1 道 HITL 审批 |
-| 代码量 | ~32KB Markdown 协议 | ~14KB Python 可执行 |
-| LLM | 无内置集成 | DeepSeek v4-pro |
-| 启动 | 手动编排 | 一键 python main.py |
-
-核心原则：**够用不复杂，可跑不纸上。**
+| Dimension | v3.0 (old) | v4.0 (new) |
+|---|---|---|
+| Agent count | 48 role cards | 3 Squad Agents |
+| Orchestration | TL->Squad Lead->Sub-Agent 3-tier | Plan->HITL->Executor main loop |
+| Gates | 17 checkpoints | 1 HITL approval |
+| Codebase | ~32KB Markdown protocols | ~14KB Python (executable) |
+| LLM integration | None | DeepSeek v4-pro |
+| Startup | Manual orchestration | `python main.py` |
 
 ---
 
-## 架构概览
+## Architecture
 
-`mermaid
+```mermaid
 flowchart TD
-    A["🚀 python main.py"] --> B["📋 Planner<br/>生成计划 + DAG"]
-    B --> C{"👤 Guard<br/>HITL 审批"}
-    C -->|"yes"| D["⚙️ Executor<br/>主循环运行"]
-    C -->|"no"| X["❌ 终止"]
-    D --> E["🤖 DeepSeek API<br/>生成内容"]
-    E --> F["📝 Squad A<br/>论文 Agent"]
-    E --> G["💻 Squad B<br/>代码 Agent"]
-    E --> H["🔧 BugFix<br/>修复 Agent"]
-    F --> I["📊 Dashboard<br/>Streamlit :8501"]
+    A["python main.py"] --> B["Planner: generate plan + DAG"]
+    B --> C{"Guard: HITL approval"}
+    C -->|"yes"| D["Executor: main loop"]
+    C -->|"no"| X["Terminate"]
+    D --> E["DeepSeek API: content generation"]
+    E --> F["Squad A: Thesis Agent"]
+    E --> G["Squad B: Code Agent"]
+    E --> H["BugFix: Repair Agent"]
+    F --> I["Dashboard: Streamlit :8501"]
     G --> I
     H --> I
-    I --> J{"任务全部完成?"}
-    J -->|"否"| D
-    J -->|"是"| K["✅ 完成"]
-`
+    I --> J{"All tasks done?"}
+    J -->|"no"| D
+    J -->|"yes"| K["Complete"]
+```
 
-### 数据流
+### Data Flow
 
-`
-runtime/plan.json ──→ Executor ──→ runtime/queue.json
-                         │
-                    DeepSeek API
-                         │
-              ┌──────────┼──────────┐
-              ▼          ▼          ▼
+```
+runtime/plan.json  -->  Executor  -->  runtime/queue.json
+                           |
+                      DeepSeek API
+                           |
+              +------------+------------+
+              |            |            |
          paper_T*.txt  code_T*.py  fix_T*.py
-              │          │          │
-              ▼          ▼          ▼
-         runtime/logs.json ←───────┘
-              │
-              ▼
-         Dashboard (实时读取)
-`
+              |            |            |
+              +------------+------------+
+                           |
+                   runtime/logs.json
+                           |
+                       Dashboard
+```
 
 ---
 
-## 快速开始
+## Quick Start
 
-`ash
-# 1. 克隆项目
+```bash
+# 1. Clone
 git clone https://github.com/your-username/AgentOS-Lite.git
 cd AgentOS-Lite
 
-# 2. 安装依赖
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. 配置 API Key
+# 3. Configure API Key (REQUIRED - see section below)
 cp .env.example .env
-# 编辑 .env 填入你的 DeepSeek API Key
+# Edit .env and paste your DeepSeek API Key
 
-# 4. 启动
+# 4. Run
 python main.py
-`
+```
 
-启动后：
-- **终端**显示 HITL 审批提示，输入 yes 确认计划
-- **浏览器**自动打开 http://localhost:8501 Dashboard
-- Executor 开始按 DAG 顺序执行任务
+After launching:
+- **Terminal** shows the HITL approval prompt (type `yes` to proceed)
+- **Browser** auto-opens `http://localhost:8501` with the live Dashboard
+- **Executor** starts running tasks in DAG order
 
 ---
 
-## 安装指南
+## Installation
 
-### 系统要求
+### Requirements
 
 - Python 3.10+
 - pip
-- 网络连接（访问 DeepSeek API）
+- Internet access (for DeepSeek API)
 
-### 依赖
+### Dependencies
 
-`	xt
-openai>=1.0.0      # DeepSeek API (OpenAI 兼容协议)
-streamlit>=1.28.0  # 实时监控 Dashboard
-`
+```
+openai>=1.0.0      # DeepSeek API (OpenAI-compatible protocol)
+streamlit>=1.28.0  # Real-time monitoring Dashboard
+```
 
-### 安装步骤
+### Steps
 
 ```bash
-# 创建虚拟环境 (推荐)
+# Create virtual environment (recommended)
 python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # macOS/Linux
+venv\Scripts\activate   # Windows
+# source venv/bin/activate  # macOS / Linux
 
-# 安装
+# Install
 pip install -r requirements.txt
 ```
 
-> ⚠️ **下一步必须配置 DeepSeek API Key，否则 AgentOS Lite 无法启动。**
-> 见下方 [配置 DeepSeek API](#配置-deepseek-api)。
-
 ---
 
-## 🔐 配置 DeepSeek API（首次使用必读）
+## DeepSeek API Setup (Required)
 
-> **本项目不含任何 API Key。** 你需要自己注册 DeepSeek 账号并获取 Key。代码中所有 API 调用均从 `.env` 文件读取，不会上传到 GitHub。
+> **This project does NOT include any API Key.** You must register for a DeepSeek account and obtain your own key. All API calls read from a `.env` file and will never be committed to Git.
 
-### 如果你在 Codex 中使用
+### If using with Codex
 
-AgentOS Lite 作为 Codex 强制性预加载 skill 时，**会自动检测 API Key 是否配置**。如果未配置，Codex 会直接提醒你：
+AgentOS Lite is registered as a mandatory preload skill in Codex. When the skill loads, it **automatically checks** whether the API Key is configured. If not, Codex will prompt you directly:
 
-> "AgentOS Lite 需要 DeepSeek API Key 才能运行。请按以下步骤配置：  
-> 1. 访问 https://platform.deepseek.com/api_keys 注册并获取 API Key  
-> 2. 在项目根目录执行：`cp .env.example .env`  
-> 3. 编辑 `.env`，替换为你的真实 Key  
-> 4. 完成后重新触发毕业设计工作流"
+> "AgentOS Lite requires a DeepSeek API Key to run. Steps:
+> 1. Visit https://platform.deepseek.com/api_keys to register and get your key
+> 2. Run `cp .env.example .env` in the project root
+> 3. Edit `.env` and replace the placeholder with your real key
+> 4. Re-trigger the graduation project workflow"
 
-### 如果你在命令行中使用
+### If using via command line
 
 ```bash
-# 1. 注册 DeepSeek 账号并获取 API Key
-#    访问: https://platform.deepseek.com/api_keys
+# 1. Register on DeepSeek Platform and obtain an API Key
+#    https://platform.deepseek.com/api_keys
 
-# 2. 创建 .env 文件
+# 2. Create the .env file from the template
 cp .env.example .env
 
-# 3. 编辑 .env，填入你的 Key
-#    DEEPSEEK_API_KEY=sk-你的真实Key
+# 3. Edit .env with your key
+#    DEEPSEEK_API_KEY=sk-your-real-key-here
 
-# 4. 启动
+# 4. Launch
 python main.py
 ```
 
-### .env 文件格式
+### .env File Format
 
 ```env
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_API_KEY=sk-你的真实Key
+DEEPSEEK_API_KEY=sk-your-real-key-here
 ```
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `DEEPSEEK_MODEL` | 模型名称 | `deepseek-chat` |
-| `DEEPSEEK_BASE_URL` | API 端点 | `https://api.deepseek.com` |
-| `DEEPSEEK_API_KEY` | **必须填写** — 你的 API Key | (无) |
+| Variable | Description | Default |
+|---|---|---|
+| `DEEPSEEK_MODEL` | Model name | `deepseek-chat` |
+| `DEEPSEEK_BASE_URL` | API endpoint | `https://api.deepseek.com` |
+| `DEEPSEEK_API_KEY` | **Required** -- your API Key | (none) |
 
-### 安装步骤
+### Available Models
 
-`ash
-# 创建虚拟环境 (推荐)
-python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # macOS/Linux
-
-# 安装
-pip install -r requirements.txt
-`
+| Model | Description | Recommended For |
+|---|---|---|
+| `deepseek-chat` | General-purpose chat model | Thesis writing, code generation |
+| `deepseek-reasoner` | Deep reasoning model | Complex logic, bug fixing |
 
 ---
 
-## 完整使用流程
+## Usage Walkthrough
 
-### Step 1: 启动
+### Step 1: Launch
 
-`ash
+```bash
 python main.py
-`
+```
 
-`
+```
 [BOOT] Agent OS Lite starting...
        DeepSeek Model: deepseek-chat
        Endpoint: https://api.deepseek.com (direct)
-[PLAN] 计划已生成
-`
+[PLAN] Plan generated
+```
 
-### Step 2: HITL 审批
+### Step 2: HITL Approval
 
-`
+```
 === PLAN REVIEW ===
-项目: 毕业设计项目
-论文章节: ['引言', '相关工作', '系统设计', '实现', '实验', '总结']
-代码模块: ['core', 'agents', 'runtime']
+Project: Graduation Project
+Thesis chapters: ['Introduction', 'Related Work', 'System Design', 'Implementation', 'Experiments', 'Conclusion']
+Code modules: ['core', 'agents', 'runtime']
 DAG: {'T1': [], 'T2': ['T1'], 'T3': ['T2'], 'T4': ['T3']}
 ===================
 Approve plan? (yes/no): yes
-`
+```
 
-输入 yes → 开始执行。
-o → 终止。
+Type `yes` to proceed, `no` to abort.
 
-### Step 3: 自动执行
+### Step 3: Automatic Execution
 
-`
+```
 [GUARD] Plan approved. Executing...
 [EXECUTOR] Agent OS core loop running...
 [EXECUTOR] Running T1 (paper)...
-[Squad A] 论文Agent: 已为 T1 生成内容 (1847 chars)
+[Squad A] Thesis Agent: generated content for T1 (1847 chars)
 [EXECUTOR] Running T2 (code)...
-[Squad B] 代码Agent: 已为 T2 生成代码 (156 lines)
+[Squad B] Code Agent: generated code for T2 (156 lines)
 [EXECUTOR] Running T3 (code)...
-[Squad B] 代码Agent: 已为 T3 生成代码 (203 lines)
+[Squad B] Code Agent: generated code for T3 (203 lines)
 [EXECUTOR] Running T4 (paper)...
-[Squad A] 论文Agent: 已为 T4 生成内容 (2103 chars)
+[Squad A] Thesis Agent: generated content for T4 (2103 chars)
 [EXECUTOR] All tasks complete. Idling...
-`
+```
 
-### Step 4: Dashboard 实时监控
+### Step 4: Dashboard
 
-浏览器访问 http://localhost:8501：
+Open `http://localhost:8501` in your browser:
 
-- 📋 **PLAN** — 论文结构 + 代码模块清单
-- 🔗 **DAG** — 任务依赖关系图
-- 📊 **QUEUE** — 每个任务的实时状态 (⏳ PENDING / 🔄 RUNNING / ✅ DONE)
-- 📝 **LOGS** — 最近 20 条执行日志
+- **PLAN** panel: thesis structure + code module list
+- **DAG** panel: task dependency graph
+- **QUEUE** panel: per-task real-time status (PENDING / RUNNING / DONE)
+- **LOGS** panel: latest 20 execution log entries
 
-### Step 5: 查看输出
+### Step 5: View Output
 
-`ash
-# 生成的论文内容
+```bash
+# Generated thesis content
 cat runtime/paper_T1.txt
 
-# 生成的代码
+# Generated code
 cat runtime/code_T2.py
 
-# 执行日志
+# Execution logs
 cat runtime/logs.json
-`
+```
 
 ---
 
-## 项目结构
+## Project Structure
 
-`
+```
 AgentOS_Lite/
-├── main.py                    # 🚀 一键启动入口
-├── requirements.txt           # 📦 Python 依赖
-├── .env.example               # 🔐 API Key 配置模板
-├── .gitignore                 # 🚫 Git 忽略规则
-├── README.md                  # 📖 本文档
+├── main.py                    # Entry point
+├── requirements.txt           # Python dependencies
+├── .env.example               # API Key template (commit to Git)
+├── .gitignore                 # Excludes .env and runtime/ state
+├── README.md                  # This file
 │
-├── bootstrap/                 # 🏗️ 启动层
+├── bootstrap/                 # Boot layer
 │   ├── __init__.py
-│   ├── launcher.py            # 系统启动 + DeepSeek API 配置
-│   └── web_open.py            # 自动打开浏览器
+│   ├── launcher.py            # Startup + DeepSeek API config (.env loader)
+│   └── web_open.py            # Auto-open browser
 │
-├── core/                      # ⚙️ 核心引擎
+├── core/                      # Engine layer
 │   ├── __init__.py
-│   ├── planner.py             # 生成项目计划 + DAG
-│   ├── guard.py               # HITL 人工审批门禁
-│   ├── executor.py            # Agent OS 主循环 + DeepSeek 调用
-│   └── scheduler.py           # DAG 拓扑排序调度
+│   ├── planner.py             # Generate project plan + DAG
+│   ├── guard.py               # HITL human approval gate
+│   ├── executor.py            # Main loop + DeepSeek API calls
+│   └── scheduler.py           # DAG topological sort scheduler
 │
-├── agents/                    # 🤖 Agent 层
+├── agents/                    # Agent layer
 │   ├── __init__.py
-│   ├── squad_a.py             # 论文生成 Agent
-│   ├── squad_b.py             # 代码生成 Agent
-│   └── bugfix.py              # Bug 修复 Agent
+│   ├── squad_a.py             # Thesis generation agent
+│   ├── squad_b.py             # Code generation agent
+│   └── bugfix.py              # Bug fix agent
 │
-├── dashboard/                 # 📊 可视化层
-│   └── app.py                 # Streamlit 实时监控 Dashboard
+├── dashboard/                 # Visualization layer
+│   └── app.py                 # Streamlit real-time monitoring
 │
-└── runtime/                   # 💾 运行时状态 (gitignored)
-    ├── plan.json              # 当前项目计划
-    ├── dag.json               # 任务依赖图
-    ├── queue.json             # 任务队列 + 状态
-    └── logs.json              # 执行日志
-`
+└── runtime/                   # Runtime state (gitignored)
+    ├── plan.json              # Current project plan
+    ├── dag.json               # Task dependency graph
+    ├── queue.json             # Task queue + status
+    └── logs.json              # Execution logs
+```
 
 ---
 
-## 核心模块详解
+## Core Modules
 
-### 1. Planner — 计划生成器
+### 1. Planner (`core/planner.py`)
 
-core/planner.py — 定义项目的任务结构和 DAG 依赖。
+Defines the project task structure and DAG dependencies.
 
-`python
+```python
 def generate_plan(topic):
     return {
         "project": topic,
-        "paper": {
-            "chapters": ["引言", "相关工作", "系统设计", "实现", "实验", "总结"]
-        },
-        "code": {
-            "modules": ["core", "agents", "runtime"]
-        },
+        "paper": {"chapters": ["Introduction", "Related Work", "..."]},
+        "code": {"modules": ["core", "agents", "runtime"]},
         "dag": {
-            "T1": [],        # 无依赖，最先执行
-            "T2": ["T1"],    # 依赖 T1
-            "T3": ["T2"],    # 依赖 T2
-            "T4": ["T3"]     # 依赖 T3
+            "T1": [],        # No dependencies; runs first
+            "T2": ["T1"],    # Depends on T1
+            "T3": ["T2"],    # Depends on T2
+            "T4": ["T3"]     # Depends on T3
         }
     }
-`
+```
 
-**扩展方式**: 修改 generate_plan() 返回结构即可自定义任务。
+### 2. Guard (`core/guard.py`)
 
----
+Human approval gate. Displays the plan summary in the terminal and waits for `yes`/`no`. `PlanGuard.validate()` checks the `locked` flag before execution.
 
-### 2. Guard — HITL 审批门禁
+### 3. Executor (`core/executor.py`)
 
-core/guard.py — 人工审批关卡，阻止错误计划进入执行。
+The heart of AgentOS. Main loop:
 
-`
-流程图:
-  Plan 生成 → 终端展示计划摘要 → 用户输入 yes/no
-    ├─ yes → locked=True → Executor 启动
-    └─ no  → exit("Plan rejected")
-`
-
-PlanGuard.validate() 在执行前检查 locked 状态，未审批则抛异常。
-
----
-
-### 3. Executor — 核心执行循环
-
-core/executor.py — AgentOS 的心脏。
-
-**主循环**:
-`
+```
 while True:
-    queue = load("runtime/queue.json")
-    for task in queue:
-        if task["status"] == "PENDING" and task["approved"]:
-            task["status"] = "RUNNING"
-            run_task(task, ds_client)  # 调用 DeepSeek API
-            task["status"] = "DONE"
-    time.sleep(2)
-`
+    for each PENDING + approved task in queue:
+        task.status = RUNNING
+        call DeepSeek API
+        task.status = DONE
+    sleep(2)
+```
 
-**任务路由**:
-| task["type"] | 调用的 API | 输出文件 | Agent |
+Task routing:
+
+| task["type"] | API call | Output file | Agent |
 |---|---|---|---|
-| "paper" | call_deepseek(prompt, max_tokens=2000) | paper_{id}.txt | squad_a |
-| "code" | call_deepseek_code(prompt) | code_{id}.py | squad_b |
-| "bug" | call_deepseek_code(fix_prompt) | ix_{id}.py | bugfix |
+| `"paper"` | `call_deepseek(prompt, max_tokens=2000)` | `paper_{id}.txt` | squad_a |
+| `"code"` | `call_deepseek_code(prompt)` | `code_{id}.py` | squad_b |
+| `"bug"` | `call_deepseek_code(fix_prompt)` | `fix_{id}.py` | bugfix |
 
-**DeepSeek API 调用**:
-`python
-def call_deepseek(ds_client, prompt, max_tokens=2000):
-    response = ds_client.chat.completions.create(
-        model=DEEPSEEK_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-        temperature=0.7,
-    )
-    return response.choices[0].message.content
-`
+### 4. Scheduler (`core/scheduler.py`)
+
+Two core functions:
+
+- `topological_sort(dag)`: Kahn''s algorithm returning a valid DAG execution order
+- `get_ready_tasks(queue, dag)`: returns tasks whose dependencies are satisfied and status is PENDING
 
 ---
 
-### 4. Scheduler — DAG 拓扑调度
+## Agent System
 
-core/scheduler.py — 两个核心功能:
+### Squad A -- Thesis Agent
+- Generates thesis chapter content
+- Output: `runtime/paper_{task_id}.txt`
 
-**	opological_sort(dag)**: Kahn 算法返回 DAG 合法执行顺序。
-`
-{"T1": [], "T2": ["T1"], "T3": ["T2"], "T4": ["T3"]}
-→ ["T1", "T2", "T3", "T4"]
-`
+### Squad B -- Code Agent
+- Generates system code
+- Output: `runtime/code_{task_id}.py`
 
-**get_ready_tasks(queue, dag)**: 返回"依赖已满足 + 状态为 PENDING"的待执行任务。
+### BugFix Squad -- Repair Agent
+- Handles bug fix requests
+- Output: `runtime/fix_{task_id}.py`
 
----
+### Adding a New Agent
 
-## Agent 系统
+Each agent follows a uniform contract. To add a new one:
 
-### Squad A — 论文 Agent
-- 负责论文各章节的内容生成
-- 输出: untime/paper_{task_id}.txt
-
-### Squad B — 代码 Agent
-- 负责系统代码的生成
-- 输出: untime/code_{task_id}.py
-
-### BugFix Squad — Bug 修复 Agent
-- 专门处理 Bug 修复请求
-- 输出: untime/fix_{task_id}.py
-
-### 扩展 Agent
-
-每个 Agent 按统一契约实现，添加新 Agent 只需三步:
-
-`python
+```python
 # agents/squad_c.py
 def run(task, content):
     task_id = task["id"]
-    # 你的处理逻辑
+    # Your logic here
     return {"task_id": task_id, "squad": "C", "result": "..."}
 
-# 然后在 executor.py 中添加路由:
+# In executor.py, add routing:
 elif task["type"] == "my_type":
     from agents import squad_c
     squad_c.run(task, content)
-`
+```
 
 ---
 
-## Dashboard 实时监控
+## Dashboard
 
-基于 **Streamlit**，零前端代码，纯 Python 实现。
+Built with **Streamlit** -- pure Python, zero frontend code.
 
-`
+```
 http://localhost:8501
-`
+```
 
-### 监控面板布局
+### Panel Layout
 
-`
-┌──────────────────────────────────────────────────────┐
-│  🔧 AgentOS Lite — DeepSeek Dashboard                │
-│  Model: deepseek-chat | Endpoint: api.deepseek.com   │
-├──────────────────┬──────────────────┬────────────────┤
-│  📋 PLAN         │  🔗 DAG          │  📊 QUEUE      │
-│  论文章节清单     │  任务依赖关系     │  ⏳ T1 PENDING │
-│  代码模块清单     │  T1→T2→T3→T4    │  ⏳ T2 PENDING │
-│                  │                  │  ⏳ T3 PENDING │
-│                  │                  │  ⏳ T4 PENDING │
-├──────────────────┴──────────────────┴────────────────┤
-│  📝 LOGS (最近 20 条)                                │
-│  [T1] DONE  [T2] RUNNING  [T3] PENDING  ...        │
-└──────────────────────────────────────────────────────┘
-`
+```
++----------------------------------------------------------+
+|  AgentOS Lite -- DeepSeek Dashboard                       |
+|  Model: deepseek-chat | Endpoint: api.deepseek.com        |
++--------------------+--------------------+----------------+
+|  PLAN              |  DAG               |  QUEUE          |
+|  Thesis chapters   |  T1 -> T2 -> T3    |  T1: DONE       |
+|  Code modules      |       -> T4        |  T2: RUNNING    |
+|                    |                    |  T3: PENDING    |
+|                    |                    |  T4: PENDING    |
++--------------------+--------------------+----------------+
+|  LOGS (latest 20 entries)                                |
+|  [T1] DONE  [T2] RUNNING  [T3] PENDING  ...             |
++----------------------------------------------------------+
+```
 
-### 实现要点
+### Implementation Notes
 
-- st.rerun() 每 2 秒自动刷新
-- 直接读取 untime/*.json 获取最新状态
-- 三栏布局 st.columns(3) 展示 Plan/DAG/Queue
-- 任务状态用 emoji 可视化: ⏳ / 🔄 / ✅ / ❌
+- `st.rerun()` auto-refreshes every 2 seconds
+- Reads `runtime/*.json` directly for live state
+- Three-column layout via `st.columns(3)`
+- Task status visualized with emoji: PENDING / RUNNING / DONE / FAILED
 
 ---
 
-## 运行时状态文件
+## Runtime State Files
 
-untime/ 目录下的 JSON 文件是 AgentOS 的状态总线：
+The `runtime/` directory holds JSON files that serve as the state bus for AgentOS:
 
 ### plan.json
-`json
+
+```json
 {
-  "project": "毕业设计项目",
-  "paper": {"chapters": ["引言", "..."] },
-  "code": {"modules": ["core", "..."] },
+  "project": "Graduation Project",
+  "paper": {"chapters": ["Introduction", "..."]},
+  "code": {"modules": ["core", "..."]},
   "dag": {"T1": [], "T2": ["T1"], "T3": ["T2"], "T4": ["T3"]}
 }
-`
+```
 
 ### queue.json
-`json
+
+```json
 [
   {"id": "T1", "type": "paper", "status": "DONE", "prompt": "...", "approved": true},
   {"id": "T2", "type": "code", "status": "RUNNING", "prompt": "...", "approved": true}
 ]
-`
+```
 
 ### logs.json
-`json
+
+```json
 [
   {"task": "T1", "status": "DONE", "type": "paper"},
   {"task": "T2", "status": "FAILED", "error": "Connection timeout"}
 ]
-`
+```
 
-> ⚠️ untime/ 已被 .gitignore 排除，不会提交到 Git。
+> `runtime/` is excluded by `.gitignore` and will not be committed.
 
 ---
 
-## 自定义与扩展
+## Customization
 
-### 修改项目结构
+### Change Project Structure
 
-编辑 core/planner.py 的 generate_plan():
+Edit `generate_plan()` in `core/planner.py`:
 
-`python
+```python
 def generate_plan(topic):
     return {
         "project": topic,
-        "paper": {"chapters": ["第1章", "第2章", ...]},
+        "paper": {"chapters": ["Chapter 1", "Chapter 2", ...]},
         "code": {"modules": ["module1", ...]},
-        "dag": {"T1": [], "T2": ["T1"], ...}  # 定义依赖
+        "dag": {"T1": [], "T2": ["T1"], ...}
     }
-`
+```
 
-### 添加新任务类型
+### Add a New Task Type
 
-1. 在 core/executor.py 的 un_task() 中添加:
-`python
+1. In `core/executor.py` `run_task()`:
+```python
 elif task["type"] == "my_type":
     result = call_deepseek(ds_client, prompt, max_tokens=4000)
     save(f"{RUNTIME_PATH}/my_{task_id}.json", result)
-`
+```
 
-2. 在 ootstrap/launcher.py 的 init_runtime() 中注册任务:
-`python
+2. In `bootstrap/launcher.py` `init_runtime()`:
+```python
 queue.append({
     "id": "T5", "type": "my_type",
     "status": "PENDING", "prompt": "...", "approved": False
 })
-`
+```
 
-### 切换 LLM 提供商
+### Switch LLM Provider
 
-任何 OpenAI 兼容的 API 都可以用——只需修改 ootstrap/launcher.py:
+Any OpenAI-compatible API works -- just change `bootstrap/launcher.py` or your `.env`:
 
-`python
-# Claude (via Anthropic)
-DEEPSEEK_BASE_URL = "https://api.anthropic.com/v1"  # 需要兼容网关
+```env
+# Claude (requires compatible gateway)
+DEEPSEEK_BASE_URL=https://api.anthropic.com/v1
 
-# 本地模型 (Ollama)
-DEEPSEEK_BASE_URL = "http://localhost:11434/v1"
-DEEPSEEK_MODEL = "llama3"
+# Local model (Ollama)
+DEEPSEEK_BASE_URL=http://localhost:11434/v1
+DEEPSEEK_MODEL=llama3
 
-# 其他国产模型
-DEEPSEEK_BASE_URL = "https://api.moonshot.cn/v1"
-DEEPSEEK_MODEL = "moonshot-v1-8k"
-`
+# Other Chinese models
+DEEPSEEK_BASE_URL=https://api.moonshot.cn/v1
+DEEPSEEK_MODEL=moonshot-v1-8k
+```
 
 ---
 
-## 架构演进历史
+## Version History
 
-| 版本 | 日期 | 说明 |
-|------|------|------|
-| v3.0 | 2026-06-08 | grad-design-squad: 48 Agent 三层协作架构，纯协议文档 |
-| v4.0 | 2026-06-11 | AgentOS Lite: DAG + DeepSeek API + Streamlit，可执行 Python |
+| Version | Date | Description |
+|---|---|---|
+| v3.0 | 2026-06-08 | grad-design-squad: 48-agent 3-tier protocol architecture |
+| v4.0 | 2026-06-11 | AgentOS Lite: DAG + DeepSeek API + Streamlit, executable Python |
 
 ---
 
 ## FAQ
 
-### Q: 如何修改论文的默认章节？
-编辑 core/planner.py 中 generate_plan() 的 chapters 列表。
+**Q: How do I change the default thesis chapters?**
+Edit the `chapters` list in `generate_plan()` inside `core/planner.py`.
 
-### Q: 运行时状态保存在哪里？
-untime/ 目录下的 JSON 文件。所有 Agent 通过共享这些文件通信。
+**Q: Where is runtime state stored?**
+In the `runtime/` directory as JSON files. All agents communicate by reading and writing these shared files.
 
-### Q: 如何重置所有任务？
-删除 untime/queue.json 和 untime/logs.json，重新运行 python main.py。
+**Q: How do I reset all tasks?**
+Delete `runtime/queue.json` and `runtime/logs.json`, then run `python main.py` again.
 
-### Q: 任务执行失败怎么办？
-Executor 捕获异常后标记任务为 FAILED，日志写入 logs.json，然后继续处理下一个任务。
+**Q: What happens when a task fails?**
+The Executor catches the exception, marks the task as FAILED, logs the error to `logs.json`, and continues to the next task.
 
-### Q: 可以在无网络环境下运行吗？
-可以。将 DEEPSEEK_BASE_URL 指向本地模型（如 Ollama http://localhost:11434/v1）。
+**Q: Can this run without internet?**
+Yes. Point `DEEPSEEK_BASE_URL` to a local model (e.g., Ollama at `http://localhost:11434/v1`).
 
-### Q: 如何处理大型项目 (>20 个任务)？
-修改 core/planner.py 增加更多 DAG 节点 + 在 init_runtime() 中注册对应任务即可。
+**Q: How do I handle large projects (>20 tasks)?**
+Add more DAG nodes in `core/planner.py` and register corresponding tasks in `init_runtime()`.
 
-### Q: 为什么叫 "AgentOS Lite"？
-"AgentOS" = Agent Operating System，"Lite" = 轻量。相比前身 v3.0 的 48 角色协议文档（只读不跑），v4.0 是真正可执行的轻量引擎。
+**Q: Why "AgentOS Lite"?**
+"AgentOS" = Agent Operating System. "Lite" = lightweight. Compared to its v3.0 predecessor (48 role cards, read-only protocols), v4.0 is an actually executable lightweight engine.
 
 ---
 
-## 贡献指南
+## Contributing
 
-欢迎提交 Issue 和 Pull Request。
+Issues and Pull Requests are welcome.
 
-### 开发环境搭建
+### Dev Setup
 
-`ash
+```bash
 git clone https://github.com/your-username/AgentOS-Lite.git
 cd AgentOS-Lite
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
-`
+```
 
-### 代码风格
+### Code Style
 
-- 遵循 PEP 8
-- 函数/类添加 docstring
-- 提交前确保 python main.py 可正常运行
-
----
-
-## 许可证
-
-MIT License — 详见 [LICENSE](LICENSE) 文件。
+- Follow PEP 8
+- Add docstrings to functions and classes
+- Ensure `python main.py` runs clean before committing
 
 ---
 
-<div align="center">
+## License
 
-**Made with ❤️ for graduation design automation**
+MIT License. See [LICENSE](LICENSE).
 
-</div>
+---
+
+**Made for graduation project automation.**
