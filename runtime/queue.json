@@ -1,0 +1,1 @@
+[{"id":"T1","type":"paper","status":"PENDING","prompt":"执行任务 T1: 引言与相关工作撰写","approved":false},{"id":"T2","type":"code","status":"PENDING","prompt":"执行任务 T2: 系统设计代码框架","approved":false},{"id":"T3","type":"code","status":"PENDING","prompt":"执行任务 T3: 核心功能实现","approved":false},{"id":"T4","type":"paper","status":"PENDING","prompt":"执行任务 T4: 实验与总结","approved":false}]
